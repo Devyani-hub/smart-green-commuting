@@ -97,3 +97,4 @@ if st.button("🌍 Recommend Green Commute"):
 # ---------------- Footer ----------------
 st.divider()
 st.caption("Capstone Project | Smart AI Green Commuting System 🌿")
+st.markdown("**Team:** Samiksha Chougule Patil, Devyani Ade, Tahaseen Mujawar, Ayesha Khan & Vaishnavi Rankhamb")
