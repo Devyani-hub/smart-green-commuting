@@ -49,6 +49,10 @@ Devyani Ade
 Ayesha Khan  
 Vaishnavi Rankhamb
 
+## License
+This project is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License (CC BY-NC 4.0).  
+This means you may use, modify, and share the project for non-commercial purposes, with attribution.
+
 ## 🌐 Live Demo
 The application is deployed on Streamlit Cloud:
 🔗 **Live App:** https://smart-green-commuting-aennpvrvvv8k4zrcsbnzs5.streamlit.app/
