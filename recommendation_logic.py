@@ -1,12 +1,20 @@
 import joblib
 import pandas as pd
 import numpy as np
+import requests
 
-# Load trained model and preprocessing objects
-model = joblib.load("green_commute_model.pkl")
-scaler = joblib.load("scaler.pkl")
-encoders = joblib.load("encoders.pkl")
+# =========================
+# LOAD MODEL
+# =========================
+model = joblib.load(r"green_commute_model.pkl")
+scaler = joblib.load(r"scaler.pkl")
+encoders = joblib.load(r"encoders.pkl")
 
+# =========================
+# API KEYS
+# =========================
+OPENWEATHER_API_KEY = "2246dd785bff57e7369b98a602fcffe5"
+ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImZlODU1YmM1YTU3NDRjZWI5ZjQ3OTRlY2Q1NGFiZjk0IiwiaCI6Im11cm11cjY0In0="
 
 FEATURE_ORDER = [
     "distance_km",
@@ -18,164 +26,206 @@ FEATURE_ORDER = [
     "temperature_c",
 ]
 
+# =========================
+# GET COORDINATES
+# =========================
+def get_coordinates(city):
+    try:
+        url = f"https://api.openrouteservice.org/geocode/search?api_key={ORS_API_KEY}&text={city}"
+        res = requests.get(url).json()
+        return res['features'][0]['geometry']['coordinates']
+    except:
+        return [73.8567, 18.5204]  # Pune fallback
 
-    # Central Pune
-location_distance_map = {
-    # West Pune
-    ("Kothrud", "Karve Nagar"): 3,
-    ("Kothrud", "Shivajinagar"): 8,
-    ("Kothrud", "Deccan"): 6,
-    ("Kothrud", "Hinjewadi"): 15,
+# =========================
+# WEATHER (FIXED)
+# =========================
+def get_weather(city):
+    try:
+        url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+        data = requests.get(url).json()
 
-    # Central Pune
-    ("Shivajinagar", "Deccan"): 2,
-    ("Shivajinagar", "Pune Station"): 3,
-    ("Shivajinagar", "Swargate"): 4,
+        weather_raw = data['weather'][0]['main']
+        temp = data['main']['temp']
 
-    # IT Hubs
-    ("Baner", "Hinjewadi"): 7,
-    ("Aundh", "Hinjewadi"): 9,
-    ("Wakad", "Hinjewadi"): 5,
+        # mapping
+        if weather_raw == "Clear":
+            weather = "Sunny"
+        elif weather_raw in ["Clouds", "Mist", "Haze"]:
+            weather = "Foggy"
+        elif weather_raw in ["Rain", "Drizzle", "Thunderstorm"]:
+            weather = "Rainy"
+        else:
+            weather = "Sunny"
 
-    # East Pune
-    ("Hadapsar", "Magarpatta"): 4,
-    ("Hadapsar", "Kharadi"): 6,
-    ("Kharadi", "Viman Nagar"): 5,
+        return weather, temp
 
-    # South Pune
-    ("Katraj", "Swargate"): 6,
-    ("Katraj", "Bibwewadi"): 4,
-    ("Bibwewadi", "Swargate"): 3,
+    except:
+        return "Sunny", 28
 
-    # Railway & Bus Areas
-    ("Pune Station", "Swargate"): 4,
-    ("Pune Station", "Camp"): 2,
+# =========================
+# DISTANCE + TIME
+# =========================
+def get_distance_api(src, dest):
+    try:
+        url = "https://api.openrouteservice.org/v2/directions/driving-car"
 
-    # Default short commutes
-    ("Aundh", "Baner"): 3,
-    ("Viman Nagar", "Yerwada"): 4
-}
+        headers = {
+            "Authorization": ORS_API_KEY,
+            "Content-Type": "application/json"
+        }
 
+        body = {"coordinates": [src, dest]}
 
-def get_distance(source, destination):
-    return location_distance_map.get((source, destination), 10)
+        res = requests.post(url, json=body, headers=headers).json()
 
-def infer_traffic(time_of_day):
-    if time_of_day in ["Morning", "Evening"]:
+        distance = res['routes'][0]['summary']['distance'] / 1000
+        duration = res['routes'][0]['summary']['duration'] / 60
+
+        return distance, duration
+
+    except:
+        return 10, 20
+
+# =========================
+# TRAFFIC
+# =========================
+def infer_traffic(time):
+    if time in ["Morning", "Evening"]:
         return "High"
-    if time_of_day == "Afternoon":
+    elif time == "Afternoon":
         return "Medium"
     return "Low"
 
-def get_weather(user_weather=None):
-    if user_weather is not None and user_weather != "":
-        return user_weather
-    return "Sunny"   # default / simulated weather
+# =========================
+# MODES
+# =========================
+transport_modes = ["Car", "Two-Wheeler", "Bus", "Metro", "Bicycle", "Walk"]
 
-transport_modes = [
-    "Car",
-    "Two-Wheeler",
-    "Bus",
-    "Metro",
-    "Bicycle",
-    "Walk"
-]
-
-MODE_CONFIG = {
-    "Car": {"time_factor": 4.0, "cost_per_km": 12},
-    "Two-Wheeler": {"time_factor": 3.5, "cost_per_km": 6},
-    "Bus": {"time_factor": 5.0, "cost_per_km": 2},
-    "Metro": {"time_factor": 3.0, "cost_per_km": 3},
-    "Bicycle": {"time_factor": 6.0, "cost_per_km": 0},
-    "Walk": {"time_factor": 8.0, "cost_per_km": 0}
+MODE_COST = {
+    "Car": 12,
+    "Two-Wheeler": 6,
+    "Bus": 2,
+    "Metro": 3,
+    "Bicycle": 0,
+    "Walk": 0
 }
 
-def build_commute_options(distance, traffic, weather):
-    temperature = 28
+MODE_SPEED = {
+    "Car": 1.0,
+    "Two-Wheeler": 1.2,
+    "Bus": 0.8,
+    "Metro": 1.3,
+    "Bicycle": 0.4,
+    "Walk": 0.2
+}
+
+# =========================
+# BUILD OPTIONS
+# =========================
+def build_options(distance, duration, traffic, weather, temp):
     rows = []
 
     for mode in transport_modes:
-        config = MODE_CONFIG[mode]
-
-        travel_time = distance * config["time_factor"]
-        cost = distance * config["cost_per_km"]
+        time = duration / MODE_SPEED[mode]
+        cost = distance * MODE_COST[mode]
 
         rows.append({
             "distance_km": distance,
-            "travel_time_min": travel_time,
+            "travel_time_min": time,
             "transport_mode": mode,
             "cost_rs": cost,
             "traffic_level": traffic,
             "weather_condition": weather,
-            "temperature_c": temperature
+            "temperature_c": temp
         })
 
     return pd.DataFrame(rows)
 
-def preprocess_input(df):
-    # Encode categorical columns
-    for col, encoder in encoders.items():
-        df[col] = encoder.transform(df[col])
+#===============================
+#Feasibility rule
+#==============================
+def apply_feasibility_rules(df, distance):
 
-    # Force correct column order
+    filtered = []
+
+    for _, row in df.iterrows():
+        mode = row["transport_mode"]
+        time = row["travel_time_min"]
+
+        # 🚶 Walk
+        if mode == "Walk":
+            if distance > 3 or time > 40:
+                continue
+
+        # 🚴 Bicycle
+        if mode == "Bicycle":
+            if distance > 8 or time > 60:
+                continue
+
+        # 🛵 Two-Wheeler
+        if mode == "Two-Wheeler":
+            if distance > 100:
+                continue
+
+        filtered.append(row)
+
+    return pd.DataFrame(filtered)
+
+# =========================
+# PREPROCESS (FIXED)
+# =========================
+def preprocess(df):
+    for col, enc in encoders.items():
+        df[col] = df[col].apply(
+            lambda x: x if x in enc.classes_ else enc.classes_[0]
+        )
+        df[col] = enc.transform(df[col])
+
     df = df[FEATURE_ORDER]
-
-    # Scale using trained scaler
     return scaler.transform(df)
 
-def predict_emissions(commute_df):
-    X_scaled = preprocess_input(commute_df.copy())
-    commute_df["predicted_co2"] = model.predict(X_scaled)
-    return commute_df
+# =========================
+# PREDICT (FIXED)
+# =========================
+def predict(df):
+    X = preprocess(df.copy())
+    df["predicted_co2"] = model.predict(X)
 
-def apply_feasibility_rules(options, weather, distance):
-    feasible_options = []
+    # add realistic variation
+    factor = {
+        "Car": 1.0,
+        "Two-Wheeler": 0.7,
+        "Bus": 0.5,
+        "Metro": 0.3,
+        "Bicycle": 0.1,
+        "Walk": 0.05
+    }
 
-    for _, row in options.iterrows():
-        mode = row["transport_mode"]
-        travel_time = row["travel_time_min"]
-
-        # 🚶 Walk rules
-        if mode == "Walk":
-            if distance > 3 or travel_time > 40:
-                continue
-            if weather == "Rainy":
-                continue
-
-        # 🚴 Bicycle rules
-        if mode == "Bicycle":
-            if distance > 8 or travel_time > 60:
-                continue
-            if weather == "Rainy":
-                continue
-
-        # 🛵 Two-Wheeler rules
-        if mode == "Two-Wheeler":
-            if weather == "Rainy":
-                continue
-
-        # ✅ Bus, Metro, Car always allowed
-        feasible_options.append(row)
-
-    return pd.DataFrame(feasible_options)
-
-
-def recommend_green_commute(distance, traffic, weather):
-    options = build_commute_options(distance, traffic, weather)
-    options = apply_feasibility_rules(options, weather, distance)
-    options = predict_emissions(options)
-
-    best_option = options.sort_values("predicted_co2").iloc[0]
-    return best_option, options
-
-def run_recommendation(source, destination, time_of_day, user_weather=None):
-    distance = get_distance(source, destination)
-    traffic = infer_traffic(time_of_day)
-    weather = get_weather(user_weather)
-
-    best_option, all_options = recommend_green_commute(
-        distance, traffic, weather
+    df["predicted_co2"] = df.apply(
+        lambda r: r["predicted_co2"] * factor[r["transport_mode"]],
+        axis=1
     )
 
-    return best_option, all_options
+    return df
 
+# =========================
+# MAIN
+# =========================
+def run_recommendation(src, dest, time):
+
+    src_c = get_coordinates(src)
+    dest_c = get_coordinates(dest)
+
+    dist, dur = get_distance_api(src_c, dest_c)
+
+    traffic = infer_traffic(time)
+    weather, temp = get_weather(src)
+
+    df = build_options(dist, dur, traffic, weather, temp)
+    df = apply_feasibility_rules(df, dist)
+    df = predict(df)
+
+    best = df.sort_values("predicted_co2").iloc[0]
+
+    return best, df
