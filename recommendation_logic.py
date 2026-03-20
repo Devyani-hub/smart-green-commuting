@@ -13,8 +13,10 @@ encoders = joblib.load(r"encoders.pkl")
 # =========================
 # API KEYS
 # =========================
-OPENWEATHER_API_KEY = "2246dd785bff57e7369b98a602fcffe5"
-ORS_API_KEY = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImZlODU1YmM1YTU3NDRjZWI5ZjQ3OTRlY2Q1NGFiZjk0IiwiaCI6Im11cm11cjY0In0="
+import streamlit as st
+
+OPENWEATHER_API_KEY = st.secrets["OPENWEATHER_API_KEY"]
+ORS_API_KEY = st.secrets["ORS_API_KEY"]
 
 FEATURE_ORDER = [
     "distance_km",
