@@ -5,8 +5,8 @@ st.set_page_config(page_title="Green Commute", page_icon="🌱")
 
 st.title("🌱 Smart AI Green Commuting")
 
-source = st.text_input("Source City", "Pune")
-dest = st.text_input("Destination City", "Mumbai")
+source = st.text_input("Source City", "Pune Station")
+dest = st.text_input("Destination City", "Swargate")
 
 time = st.selectbox("Time", ["Morning", "Afternoon", "Evening"])
 
