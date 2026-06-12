@@ -10,14 +10,6 @@ Based on predictions, the system recommends the most efficient and environmental
 The project aims to reduce pollution, optimize carbon footprint and promote sustainable mobility. 
 The project supports sustainable mobility and reduces pollution in smart communities.
 
-🧩 Project Contributors
-| Member                  | Role / Contribution                                                                                              |
-| ------------------------| ---------------------------------------------------------------------------------------------------------------- |
-| Samiksha Chougule Patil |                                                                                                                  |
-| Devyani Ade             |                                                                                                                  |
-| Tahaseen Mujawar        |                                                                                                                  |
-| Vaishnavi Rankhamb      |                                                                                                                  |
-| Ayesha Khan             |                                                                                                                  |
 
 🔄 System Workflow
 User Inputs → Pre‑processing → CO₂ Prediction → Feasibility Check → Ranking → Best Green Commute Output
