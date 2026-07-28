@@ -37,6 +37,7 @@ st.markdown("""
 <style>
 /* ── General ── */
 [data-testid="stAppViewContainer"] { background: #f0f4f0; }
+[data-testid="stAppViewContainer"] * { color: #1b5e20 !important; }
 [data-testid="stSidebar"]          { background: #1a2f1a; }
 [data-testid="stSidebar"] *        { color: #e8f5e9 !important; }
 
